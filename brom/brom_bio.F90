@@ -316,7 +316,7 @@ call self%register_diagnostic_variable(self%id_N_fixation,'N_fixation','mmol/m**
      GrowthPhy     =self%K_phy_gro*LimLight*LimT*min(LimP,LimN,LimSi)*Phy
 
 !%! Rate of mortality of phy
-     MortPhy=max(0.99,(self%K_phy_mrt+(0.5-0.5*tanh(O2-60.))*0.45+(0.5-0.5*tanh(O2-20))*0.45))*Phy !+(0.5-0.5*tanh(LimLight-0.1))*0.4)
+     MortPhy=max(0.99,(self%K_phy_mrt+(0.5-0.5*tanh(O2-60.))*0.45+(0.5-0.5*tanh(O2-20.))*0.45))*Phy !+(0.5-0.5*tanh(LimLight-0.1))*0.4)
 
 !&! Excretion of phy
      ExcrPhy=self%K_phy_exc*Phy
