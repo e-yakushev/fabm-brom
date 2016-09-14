@@ -1,3 +1,14 @@
+!-----------------------------------------------------------------------
+! OXYDEP_COD is free software: you can redistribute it and/or modify it under
+! the terms of the GNU General Public License as published by the Free
+! Software Foundation (https://www.gnu.org/licenses/gpl.html).
+! It is distributed in the hope that it will be useful, but WITHOUT ANY
+! WARRANTY; without even the implied warranty of MERCHANTABILITY or
+! FITNESS FOR A PARTICULAR PURPOSE. A copy of the license is provided in
+! the COPYING file at the root of the FABM distribution.
+!-----------------------------------------------------------------------
+! Original author(s): Evgeniy Yakushev, Elizaveta Protsenko
+!-----------------------------------------------------------------------
 #include "fabm_driver.h"
 
 !-----------------------------------------------------------------------
@@ -12,8 +23,7 @@
 !
 ! OXYDEP_COD parameterize  the Chemical Oxygen Demand, COD (https://en.wikipedia.org/wiki/Chemical_oxygen_demand) 
 ! OM mineralization, nitrification, and oxidation of reduced specied of S, Mn, Fe, present in suboxic conditions.
-! OXYDEP_COD consists of 6 state variables ( in N-units):
-! - OXY - is dissolved oxygen.
+! OXYDEP_COD consists of 1 state variables ( in oxygen-units):
 ! - CHON - is a theoretical organic compound CnHaObNc that can be can be fully oxidized to inorganic nutrients 
 !   with a strong oxidizing agent under acidic condition (oxygen).
 !
@@ -26,14 +36,13 @@
    private
 !
 ! !REVISION HISTORY:!
-!  Original author(s): Evgeniy Yakushev, Jorn Bruggeman
+!  Original author(s): Evgeniy Yakushev, Elizaveta Protsenko
 !
 ! !PUBLIC DERIVED TYPES:
    type,extends(type_base_model),public :: type_niva_oxydep_cod
 !     Variable identifiers
-      type (type_state_variable_id)        :: id_oxy,id_nut, id_dom, id_CHON
+      type (type_state_variable_id)        :: id_oxy, id_nut, id_dom, id_CHON
       type (type_dependency_id)            :: id_par,id_temp, id_salt
-      type (type_horizontal_dependency_id) :: id_I_0
       type (type_horizontal_dependency_id) :: id_windspeed
       type (type_diagnostic_variable_id)   :: id_CHON_decay_ox,id_CHON_decay_denitr
 !     Model parameters
@@ -51,7 +60,7 @@
 !-----------------------------------------------------------------------
 !BOP
 !
-! !IROUTINE: Initialise the NPZD model
+! !IROUTINE: Initialise the OXYDEP-COD model
 !
 ! !INTERFACE:
    subroutine initialize(self,configunit)
@@ -82,20 +91,18 @@
    call self%register_state_variable(self%id_CHON,'CHON','mmol/m**3','CHON  oxidizable compound ', 0.0_rk, minimum=0.0_rk)
    ! Register link to external variables
    call self%register_state_dependency(self%id_oxy,'Oxy','mmol/m**3','OXY')
-!   call self%register_state_dependency(self%id_oxy,'CHON','mmol/m**3','CHON')
 !   call self%register_state_dependency(self%id_oxy,'NUT','mmol/m**3','NUT')
 !   call self%register_state_dependency(self%id_oxy,'DOM','mmol/m**3','DOM')
    ! Register diagnostic variables
 call self%register_diagnostic_variable(self%id_CHON_decay_ox,'CHON_decay_ox','mmol/m**3/d',  'CHON_decay_ox,  Mineralization of CHON with oxygen',           &
                     output=output_time_step_integrated)
-call self%register_diagnostic_variable(self%id_CHON_decay_denitr,'CHON_decay_denitr','mmol/m**3/d',  'CHON_decay_denitr,  Mineralization of CHON with nitrate',           &
-                    output=output_time_step_integrated)
+!call self%register_diagnostic_variable(self%id_CHON_decay_denitr,'CHON_decay_denitr','mmol/m**3/d',  'CHON_decay_denitr,  Mineralization of CHON with nitrate',           &
+!                    output=output_time_step_integrated)
    ! Register environmental dependencies
    call self%register_dependency(self%id_temp,standard_variables%temperature)
    call self%register_dependency(self%id_salt,standard_variables%practical_salinity)
-   call self%register_dependency(self%id_windspeed,standard_variables%wind_speed)
-   call self%register_dependency(self%id_par, standard_variables%downwelling_photosynthetic_radiative_flux)
-!   call self%register_dependency(self%id_I_0, standard_variables%surface_downwelling_shortwave_flux)
+!   call self%register_dependency(self%id_windspeed,standard_variables%wind_speed)
+!   call self%register_dependency(self%id_par, standard_variables%downwelling_photosynthetic_radiative_flux)
 
    end subroutine initialize
 !EOC
@@ -119,12 +126,12 @@ call self%register_diagnostic_variable(self%id_CHON_decay_denitr,'CHON_decay_den
 !  Original author(s):
 !
 ! !LOCAL VARIABLES:
-   real(rk)                   :: CHON,oxy,nut,dom,t,iopt,I_0
+   real(rk)                   :: CHON,oxy,nut,dom,t,iopt
 
    real(rk) :: doxy,dCHON
  ! Rates of biogeochemical processes
    real(rk) :: CHON_decay_ox            ! oxic mineralization of CHON and ammonification (1/d)
-   real(rk) :: CHON_decay_denitr        ! suboxic mineralization of CHON (denitrification) (1/d)
+!   real(rk) :: CHON_decay_denitr        ! suboxic mineralization of CHON (denitrification) (1/d)
 !EOP
 !-----------------------------------------------------------------------
 !BOC
@@ -134,22 +141,17 @@ call self%register_diagnostic_variable(self%id_CHON_decay_denitr,'CHON_decay_den
    ! Retrieve current (local) state variable values.
    _GET_(self%id_oxy,oxy)
    _GET_(self%id_CHON,CHON)
-   _GET_(self%id_nut,nut)
-   _GET_(self%id_dom,dom)
+!   _GET_(self%id_nut,nut)
+!   _GET_(self%id_dom,dom)
 
    ! Retrieve current environmental conditions.
 !   _GET_(self%id_par,Iz)              ! local photosynthetically active radiation
-!   _GET_HORIZONTAL_(self%id_I_0,I_0)  ! surface short wave radiation
    _GET_(self%id_temp,t)              ! temperature
 
 !--------------------------------------------------------------
-! Phy
-!--------------------------------------------------------------
-
-!--------------------------------------------------------------
-! Oxic mineralization of POM and ammonification depend on T
+! Oxic mineralization of CHON depends on T
    CHON_decay_ox   = self%r_CHON_nut_oxy*(1.+self%beta_da*yy(self%tda,t))*CHON
-! Suboxic mineralization of OM (denitrification and anammox), depends on T,O2,NO3/NO2
+! Suboxic mineralization depends on T,O2,NO3/NO2
    !CHON_decay_denitr = self%r_pom_nut_nut*(1.+self%beta_da*yy(self%tda,t)) &
    !                        * (0.5-0.5*tanh(self%O2LimC-oxy)) &
    !                        * (1-tanh(1.-nut))*pom
