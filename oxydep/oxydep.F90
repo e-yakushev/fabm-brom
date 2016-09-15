@@ -56,6 +56,7 @@
    type,extends(type_base_model),public :: type_niva_oxydep
 !     Variable identifiers
       type (type_state_variable_id)        :: id_oxy,id_phy,id_het,id_nut,id_pom,id_dom
+      type (type_state_variable_id)        :: id_dic, id_alk
       type (type_dependency_id)            :: id_par,id_temp, id_salt
       type (type_horizontal_dependency_id) :: id_windspeed
       type (type_diagnostic_variable_id)   :: id_MortHet,id_RespHet,id_GrazPhy,id_GrazPOM,id_GrowthPhy,id_MortPhy,id_ExcrPhy
@@ -170,12 +171,12 @@
    call self%get_parameter(self%NtoN,     'NtoN',         'uM(N)/uM(N)',   'Richards denitrification (84.8/16.)',          default=5.3_rk)
 
    ! Register state variables
-   call self%register_state_variable(self%id_oxy,'Oxy','mmol/m**3','OXY',  150.0_rk, minimum=0.0_rk)
-   call self%register_state_variable(self%id_phy,'Phy','mmol/m**3','PHY',  0.1_rk, minimum=0.0_rk, vertical_movement=self%Wphy)
-   call self%register_state_variable(self%id_nut,'NUT','mmol/m**3','NUT',  1.0_rk, minimum=0.0_rk)
+   call self%register_state_variable(self%id_oxy,'Oxy','mmol/m**3','Oxygen',  150.0_rk, minimum=0.0_rk)
+   call self%register_state_variable(self%id_phy,'Phy','mmol/m**3','Phytoplankton',  0.1_rk, minimum=0.0_rk, vertical_movement=self%Wphy)
+   call self%register_state_variable(self%id_nut,'NUT','mmol/m**3','Nutrient',  1.0_rk, minimum=0.0_rk)
    call self%register_state_variable(self%id_pom,'POM','mmol/m**3','POM',  0.1_rk, minimum=0.0_rk, vertical_movement=self%Wpom)
    call self%register_state_variable(self%id_dom,'DOM','mmol/m**3','DOM',  0.1_rk, minimum=0.0_rk)
-   call self%register_state_variable(self%id_het,'Het','mmol/m**3','HET',  0.1_rk, minimum=0.0_rk, vertical_movement=self%Whet)
+   call self%register_state_variable(self%id_het,'Het','mmol/m**3','Heterotrophs',  0.1_rk, minimum=0.0_rk, vertical_movement=self%Whet)
    ! Register the contribution of all state variables to total nitrogen
    call self%add_to_aggregate_variable(standard_variables%total_nitrogen,self%id_phy)
    call self%add_to_aggregate_variable(standard_variables%total_nitrogen,self%id_nut)
@@ -183,6 +184,9 @@
    call self%add_to_aggregate_variable(standard_variables%total_nitrogen,self%id_dom)
    call self%add_to_aggregate_variable(standard_variables%total_nitrogen,self%id_het)
 
+   ! Register link to external DIC pool, if DIC variable name is provided in namelist.
+   !call self%register_state_dependency(self%id_dic,'dic','mmol/m**3','total dissolved inorganic carbon',required=.false.)
+   !call self%register_state_dependency(self%id_alk,'alk','mmol/m**3','total alkalinity',required=.false.)
 
    ! Register diagnostic variables
 call self%register_diagnostic_variable(self%id_MortHet,'MortHet','mmol/m**3/d',  'MortHET,  Mortality of Het',           &
@@ -365,6 +369,9 @@ call self%register_diagnostic_variable(self%id_POM_decay_denitr,'POM_decay_denit
    dphy = GrowthPhy-RespPhy-ExcrPhy-MortPhy-GrazPhy
    dhet = self%Uz*(GrazPhy+GrazPOM)-MortHet-RespHet
 !--------------------------------------------------------------
+   ! If an externally maintained DIC pool is present, change the DIC pool according to the
+   ! the change in nutrients (assuming constant C:N ratio)
+   !if (_AVAILABLE_(self%id_dic)) _SET_ODE_(self%id_dic,self%dic_per_n*dnut)
 
 
 !derivatives for FABM
