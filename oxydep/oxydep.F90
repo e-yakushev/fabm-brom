@@ -294,7 +294,7 @@ call self%register_diagnostic_variable(self%id_POM_decay_denitr,'POM_decay_denit
    ! Growth of Phy and uptake of NUT
        LimLight = Iz/self%Iopt*exp(1-Iz/self%Iopt)  !Dependence on Irradiance
        LimT     = exp(self%bm*t-self%cm)            !Dependence on Temperature
-       LimN     = yy(self%Knut,nut/phy)             !Dependence on nutrients
+       LimN     = yy(self%Knut,nut/(max(0.0001,phy)))             !Dependence on nutrients
     GrowthPhy = self%Max_uptake*LimLight*LimT*LimN*phy
 
    ! Respiraion of Phy and increase of NUT
@@ -312,16 +312,16 @@ call self%register_diagnostic_variable(self%id_POM_decay_denitr,'POM_decay_denit
 ! Het
 !--------------------------------------------------------------
    ! Grazing of Het on Phy
-    GrazPhy = het*self%r_phy_het*yy(self%Kphy,(max(0.0_rk,phy-0.01))/(het+0.0001))
+    GrazPhy = het*self%r_phy_het*yy(self%Kphy,(max(0.0_rk,phy-0.01))/max(het,0.0001))
 
    ! Grazing of Het on POM
-    GrazPOM = self%r_pop_het*het*yy(self%Kpop,(max(0.0_rk,pom-0.01))/(het+0.0001))
+    GrazPOM = self%r_pop_het*het*yy(self%Kpop,(max(0.0_rk,pom-0.01))/max(het,0.0001))
 
    ! Respiraion of HET and increase of NUT
-    RespHet = self%r_het_nut*het !*(0.5+0.5*tanh(oxy-20))
+    RespHet = self%r_het_nut*het !*(0.5+0.5*tanh(oxy-self%O2_suboxic))
 
    ! Mortality of HET and increase of POM
-    MortHet = het*(self%r_het_pom+(0.5-0.5*tanh(oxy-15))*0.3) 
+    MortHet = het*(self%r_het_pom+(0.5-0.5*tanh(oxy-self%O2_suboxic))*0.3) 
 
 !--------------------------------------------------------------
 ! POM
@@ -331,7 +331,7 @@ call self%register_diagnostic_variable(self%id_POM_decay_denitr,'POM_decay_denit
 
    ! Oxic mineralization of POM and ammonification depend on T
     POM_decay_ox   = self%r_pom_nut_oxy*(1.+self%beta_da*yy(self%tda,t))*pom
-   ! Suboxic mineralization of OM (denitrification and anammox), depends on T,O2,NO3/NO2
+   ! Suboxic mineralization of OM (denitrification and anammox), depends on T,O2,NO3(+NO2)
     POM_decay_denitr = self%r_pom_nut_nut*(1.+self%beta_da*yy(self%tda,t)) &
                       * (0.5-0.5*tanh(self%O2_suboxic-oxy)) &
                       * (1-tanh(1.-nut))*pom
@@ -341,7 +341,7 @@ call self%register_diagnostic_variable(self%id_POM_decay_denitr,'POM_decay_denit
 !--------------------------------------------------------------
 ! Oxic mineralization of DOM and ammonification depend on T
     DOM_decay_ox   = self%r_dom_nut_oxy*(1.+self%beta_da*yy(self%tda,t))*dom
-! Suboxic mineralization of OM (denitrification and anammox), depends on T,O2,NO3/NO2
+! Suboxic mineralization of OM (denitrification and anammox), depends on T,O2,NO3(+NO2)
     DOM_decay_denitr = self%r_dom_nut_nut*(1.+self%beta_da*yy(self%tda,t)) &
                            * (0.5-0.5*tanh(self%O2_suboxic-oxy)) &
                            * (1-tanh(10.-nut))*dom
