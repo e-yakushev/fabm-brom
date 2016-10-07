@@ -23,6 +23,7 @@ contains
       use fabm_niva_brom_eqconst
       use fabm_niva_brom_redox
       use fabm_niva_brom_salt
+      use fabm_niva_brom_metals_hg
       ! Add new NIVA models here
 
       class (type_factory),intent(in) :: self
@@ -36,6 +37,7 @@ contains
          case ('brom_eqconst'); allocate(type_niva_brom_eqconst::model)
          case ('brom_redox');   allocate(type_niva_brom_redox::model)
          case ('brom_salt');    allocate(type_niva_brom_salt::model)
+         case ('brom_metals_hg');    allocate(type_niva_brom_metals_hg::model)
          ! Add new NIVA models here
       end select
 
