@@ -29,9 +29,9 @@
 !      type (type_state_variable_id)        :: id_Cu,id_CuS,id_Cu_prt
 !      type (type_state_variable_id)        :: id_Ba, id_BaSO4, id_SO4     
       type (type_state_variable_id)        ::  id_H2S, id_O2, id_Fe2,id_Fe3,id_Baae,id_Bhae,id_Baan,id_Bhan        
-      type (type_dependency_id)            :: id_temp,id_par,id_depth
-      type (type_state_variable_id)        :: id_Ni,id_Ni2S,id_Ni_biota, id_Ni_POM, id_Ni_DOM, id_Ni_miner
-      
+      type (type_dependency_id)            :: id_temp,id_par,id_depth,id_Hplus
+      type (type_state_variable_id)        :: id_Ni,id_NiS,id_Ni_biota, id_Ni_POM, id_Ni_DOM, id_Ni_miner
+     type (type_diagnostic_variable_id)    :: id_NiS_diss,id_NiS_form
 
 !      type (type_state_variable_id)        :: id_Hg0,id_Hg2,id_MeHg,id_HgS      
 !      type (type_horizontal_dependency_id) :: id_windspeed, id_pCO2a
@@ -44,6 +44,9 @@
       real(rk) :: K_hg0_irr_ox ! photo-oxidation of hg0    
       real(rk) :: K_hg2_irr_red ! photo-reduction of Hg2      
       real(rk) :: K_HgS, K_hgs_form, K_hgs_ox, K_hgs_diss, O2s_nf      
+
+      !---- Ni---------!
+       real(rk) ::  K_NiS, K_NiS_form, K_NiS_diss
       !----Point source parameters----!  
 !      real(rk) :: Q_source, R_layer, Ba_source, Fe2_source, O2_source, Hg_source     
        !---- Sinking---!      
@@ -90,13 +93,16 @@
 
    call self%get_parameter(self%O2s_nf, 'O2s_nf', '[uM O]','half saturation for nitrification',default=4.488_rk)
 
+   call self%get_parameter(self%K_NiS,      'K_NiS',    '[uM]',     'K_NiS equilibrium constant (Solubility Product Constant)',   default=2510.0_rk)
+   call self%get_parameter(self%K_NiS_form, 'K_NiS_form', '[1/day]','Specific rate of precipitation of NiS from Ni with H2S',   default=5.e-5_rk)
+   call self%get_parameter(self%K_NiS_diss, 'K_NiS_diss', '[1/day]','Specific rate of dissollution of NiS to Ni and H2S',   default=1.e-6_rk)
       !---- Ni---------!      
    call self%register_state_variable(self%id_Ni,    'Ni',    'mmol/m**3','Ni',         minimum=0.0_rk)
    call self%register_state_variable(self%id_Ni_biota,'Ni_biota','mmol/m**3','Ni_biota', minimum=0.0_rk,vertical_movement=-self%Wphy/86400._rk)
    call self%register_state_variable(self%id_Ni_POM,'Ni_POM','mmol/m**3','Ni_POM', minimum=0.0_rk,vertical_movement=-self%Wsed/86400._rk)
    call self%register_state_variable(self%id_Ni_DOM,'Ni_DOM','mmol/m**3','Ni_DOM', minimum=0.0_rk)
    call self%register_state_variable(self%id_Ni_miner,'Ni_miner','mmol/m**3','Ni_miner', minimum=0.0_rk,vertical_movement=-self%Wsed/86400._rk)
-   call self%register_state_variable(self%id_Ni2S,  'Ni2S',  'mmol/m**3','Ni2S',       minimum=0.0_rk,vertical_movement=-self%Wm/86400._rk)
+   call self%register_state_variable(self%id_NiS,  'NiS',  'mmol/m**3','NiS',       minimum=0.0_rk,vertical_movement=-self%Wm/86400._rk)
 
    call self%register_state_dependency(self%id_O2,  'O2',    'mmol/m**3', 'O2')
    call self%register_state_dependency(self%id_Fe2, 'Fe2',   'mmol/m**3', 'Fe2')
@@ -113,7 +119,7 @@
    call self%register_dependency(self%id_depth,standard_variables%pressure)  
    call self%register_dependency(self%id_par, standard_variables%downwelling_photosynthetic_radiative_flux)
 !   call self%register_dependency(self%id_Izt,'Izt','W/m2','downwelling_photosynthetic_radiative_flux')
-   
+   call self%register_dependency(self%id_Hplus, 'Hplus', 'mmol/m**3','H+')
    ! Specify that are rates computed in this module are per day (default: per second)
    self%dt = 86400.
    
@@ -139,10 +145,11 @@
 !  Original author(s): 
 !
 ! !LOCAL VARIABLES:
-   real(rk) ::  Ni, Ni2S, Ni_biota, Ni_POM, Ni_DOM, Ni_miner
-   real(rk) ::  temp, O2, Fe2, Fe3, depth
+   real(rk) ::  Ni, NiS, Ni_biota, Ni_POM, Ni_DOM, Ni_miner
+   real(rk) ::  temp, O2, Fe2, Fe3, depth, Hplus
 !   real(rk) ::  Hg0, Hg2, MeHg, HgS
    real(rk) ::  Iz, Bhan, Baan, H2S !, Om_HgS, Hg2_flux 
+   real(rk) ::  Om_NiS, NiS_form, NiS_diss
 !   real(rk) ::  hgs_form, hgs_diss, hgs_ox, hg2_hg0, hg0_hg2, hg0_irr_ox, hg2_irr_red, mehg_irr_degr, hg2_mehg, mehg_hg2
 !EOP 
 !-----------------------------------------------------------------------
@@ -170,13 +177,22 @@
     _GET_(self%id_Fe3,Fe3)
     _GET_(self%id_O2,O2)   
     _GET_(self%id_Ni,Ni) 
-    _GET_(self%id_Ni2S,Ni2S) 
+    _GET_(self%id_NiS,NiS) 
     _GET_(self%id_Ni_biota,Ni_biota)
     _GET_(self%id_Ni_POM,Ni_POM)
     _GET_(self%id_Ni_DOM,Ni_DOM)
     _GET_(self%id_Ni_miner,Ni_miner)
 
-!    ! Hg species (Knigthes 2008)
+!    ! Ni species 
+! NiS formation 
+! Ni + H2S -> 
+!FeS formation/dissollution (Bektursunova, 11)
+          Om_NiS=H2S*Ni/(self%K_NiS)
+!% FeS formation Fe2+ + HS- -> FeS + H+ (Bektursunova, 11)
+    NiS_form=self%K_NiS_form*max(0._rk,(Om_NiS-1._rk)) !*1.e-20
+!% FeS dissollution FeS + H+ -> Fe2+ + HS (Bektursunova, 11)
+    NiS_diss=self%K_NiS_diss*NiS*max(0._rk,(1._rk-Om_NiS)) !*1.e-20
+
 !!% Hg0 bioreduction  Hg0 -> Hg2+  ()
 !    hg0_hg2=self%K_hg0_hg2*Hg0         
 !!% Hg2 biooxydation  Hg2+ + 0.5O2 + 2H+-> Hg0 + H2O   ()
@@ -209,7 +225,7 @@
     
 
    _SET_ODE_(self%id_Ni,0.0_rk)
-   _SET_ODE_(self%id_Ni2S,0.0_rk)
+   _SET_ODE_(self%id_NiS,NiS_diss-NiS_form)
    _SET_ODE_(self%id_Ni_biota,0.0_rk)
    _SET_ODE_(self%id_Ni_POM,0.0_rk)
    _SET_ODE_(self%id_Ni_DOM,0.0_rk)
@@ -218,11 +234,11 @@
    !_SET_ODE_(self%id_Hg2, hg0_hg2-hg2_hg0-hg2_mehg+mehg_hg2-hgs_form+hgs_diss)    
    !_SET_ODE_(self%id_MeHg,hg2_mehg-mehg_hg2)
    !_SET_ODE_(self%id_HgS,+hgs_form-hgs_diss)
-   _SET_ODE_(self%id_Baan,0.)   
-   _SET_ODE_(self%id_Bhan,0.)
-   _SET_ODE_(self%id_Fe3,0.)
-   _SET_ODE_(self%id_H2S,0.)
-   _SET_ODE_(self%id_O2,0.)      
+   _SET_ODE_(self%id_Baan,0.0_rk)   
+   _SET_ODE_(self%id_Bhan,0.0_rk)
+   _SET_ODE_(self%id_Fe3,0.0_rk)
+   _SET_ODE_(self%id_H2S,NiS_diss-NiS_form)
+   _SET_ODE_(self%id_O2,0.0_rk)
 
 ! Leave spatial loops (if any)
    _LOOP_END_
