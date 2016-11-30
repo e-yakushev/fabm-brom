@@ -47,7 +47,7 @@
       type (type_diagnostic_variable_id)   :: id_CHON_decay_ox,id_CHON_decay_denitr
 !     Model parameters
       !---Organic matter mineralization---- !
-       real(rk) :: r_CHON_nut_oxy,r_CHON_nut_nut,r_CHON_dom_oxy, r_CHON_dom_nut, Tda, beta_da
+       real(rk) :: r_CHON_nut_oxy,r_CHON_nut_nut,r_CHON_dom_oxy, r_CHON_dom_nut, Tda, beta_da, Wchon, Bu
    contains
       procedure :: initialize
       procedure :: do
@@ -84,17 +84,19 @@
    ! NB: all rates must be provided in values per day,
    ! and are converted here to values per second.
   ! CHON
-   call self%get_parameter(self%r_CHON_nut_oxy, 'r_CHON_nut_oxy',     '1/d', 'Specific rate of CHON mineralization',          default=0.10_rk,scale_factor=d_per_s)
-   call self%get_parameter(self%beta_da,        'beta_da',       'nd',  'Coefficient for dependence of mineralization on t ', default=20._rk)
-   call self%get_parameter(self%Tda,            'Tda',           'nd',  'Coefficient for dependence of mineralization on t ', default=13._rk)
+   call self%get_parameter(self%r_CHON_nut_oxy, 'r_CHON_nut_oxy', '1/d', 'Specific rate of CHON mineralization',               default=0.10_rk,scale_factor=d_per_s)
+   call self%get_parameter(self%beta_da,        'beta_da',         'nd', 'Coefficient for dependence of mineralization on t ', default=20._rk)
+   call self%get_parameter(self%Tda,            'Tda',             'nd', 'Coefficient for dependence of mineralization on t ', default=13._rk)
+   call self%get_parameter(self%Wchon,          'Wchon',          'm/s', 'vertical velocity of CHON (<0 for sinking)',         default=-1.0_rk,scale_factor=d_per_s)
+   call self%get_parameter(self%Bu,             'Bu',             'nd',  'Burial coeficient for lower boundary',               default=0.25_rk)
    ! Register state variables
-   call self%register_state_variable(self%id_CHON,'CHON','mmol/m**3','CHON  oxidizable compound ', 0.0_rk, minimum=0.0_rk)
+   call self%register_state_variable(self%id_CHON,'CHON','mmol/m**3','CHON  oxidizable compound ', 0.0_rk, minimum=0.0_rk, vertical_movement=self%Wchon)
    ! Register link to external variables
    call self%register_state_dependency(self%id_oxy,'Oxy','mmol/m**3','OXY')
 !   call self%register_state_dependency(self%id_oxy,'NUT','mmol/m**3','NUT')
 !   call self%register_state_dependency(self%id_oxy,'DOM','mmol/m**3','DOM')
    ! Register diagnostic variables
-call self%register_diagnostic_variable(self%id_CHON_decay_ox,'CHON_decay_ox','mmol/m**3/d',  'CHON_decay_ox,  Mineralization of CHON with oxygen',           &
+   call self%register_diagnostic_variable(self%id_CHON_decay_ox,'CHON_decay_ox','mmol/m**3/d',  'CHON_decay_ox,  Mineralization of CHON with oxygen',           &
                     output=output_time_step_integrated)
 !call self%register_diagnostic_variable(self%id_CHON_decay_denitr,'CHON_decay_denitr','mmol/m**3/d',  'CHON_decay_denitr,  Mineralization of CHON with nitrate',           &
 !                    output=output_time_step_integrated)
@@ -163,7 +165,7 @@ call self%register_diagnostic_variable(self%id_CHON_decay_ox,'CHON_decay_ox','mm
 ! OXY
 !--------------------------------------------------------------
 ! Changes of OXY due to OM production and decay!
-   doxy  = -CHON_decay_ox
+   doxy  = -2.*CHON_decay_ox
    dCHON = -CHON_decay_ox
 !   dnut = 
 !   ddom = 
@@ -184,6 +186,35 @@ _SET_DIAGNOSTIC_(self%id_CHON_decay_ox,CHON_decay_ox)
    _LOOP_END_
 
    end subroutine do
+
+!-----------------------------------------------------------------------
+!BOP
+!
+! !IROUTINE:
+!
+! !INTERFACE:
+   subroutine do_bottom(self,_ARGUMENTS_DO_BOTTOM_)
+!
+! !DESCRIPTION:
+!
+
+! !INPUT PARAMETERS:
+   class (type_niva_oxydep_cod),intent(in) :: self
+   _DECLARE_ARGUMENTS_DO_BOTTOM_
+!
+! !LOCAL VARIABLES:
+   real(rk)                   :: chon
+
+   _HORIZONTAL_LOOP_BEGIN_
+   _GET_(self%id_chon,chon)
+
+   ! BURYING into the sediments, mmol/m2/s (sinking rates "Wxxx" are in m/s and positive upward)
+   _SET_BOTTOM_EXCHANGE_(self%id_chon,self%Bu*self%Wchon*chon)
+
+   _HORIZONTAL_LOOP_END_
+
+   end subroutine
+!-----------------------------------------------------------------------
 
 !-----------------------------------------------------------------------
 !BOP
