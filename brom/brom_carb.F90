@@ -37,6 +37,7 @@
       type (type_state_variable_id)        :: id_DIC,id_Alk
       type (type_diagnostic_variable_id)   :: id_pH,id_pCO2,id_Hplus,id_Om_Ca,id_Om_Ar,id_CO3,id_Ca
       type (type_dependency_id)            :: id_temp,id_salt,id_pres,id_pCO2w
+      type (type_dependency_id)            :: id_porosity
       type (type_dependency_id)            :: id_PO4,id_Si,id_NH4,id_DON,id_H2S,id_Mn3,id_Mn4,id_Fe3,id_SO4
       type (type_dependency_id)            :: id_Kc1,id_Kc2,id_Kw,id_Kb,id_Kp1,id_Kp2,id_Kp3,id_Kc0,id_KSi,id_Knh4,id_Kh2s, &
           id_kso4, id_kflu, id_tot_free
@@ -79,6 +80,8 @@
    call self%register_state_variable(self%id_Alk, 'Alk', 'mmol/m**3','Alk', minimum=0.0_rk)
 
    call self%register_dependency(self%id_temp,standard_variables%temperature)
+   call self%register_dependency(self%id_porosity,&
+        type_bulk_standard_variable(name="porosity",units="1"))
    call self%register_dependency(self%id_salt,standard_variables%practical_salinity)
    call self%register_dependency(self%id_pres,standard_variables%pressure)
    call self%register_dependency(self%id_pco2a,standard_variables%mole_fraction_of_carbon_dioxide_in_air)
@@ -146,6 +149,7 @@
 !
 ! !LOCAL VARIABLES:
    real(rk) :: temp,salt,pres
+   real(rk) :: porosity
    real(rk) :: DIC,Alk,PO4,Si,NH4,DON,H2S,Mn3,Mn4,Fe3,SO4
    real(rk) :: Kc1,Kc2,Kw,Kb,Kp1,Kp2,Kp3,Kc0,KSi,Knh4,Kh2s, &
           kso4, kflu, tot_free
@@ -161,6 +165,7 @@
    _LOOP_BEGIN_
 
    ! Environment
+   _GET_(self%id_porosity,porosity)              ! temperature
    _GET_(self%id_temp,temp)              ! temperature
    _GET_(self%id_salt,salt)              ! salinity
    _GET_(self%id_pres,pres)              ! pressure in dbar
